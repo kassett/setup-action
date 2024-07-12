@@ -123,7 +123,10 @@ runs:
           lines = [f"{k}={v}" for k, v in variables.items()]
           env_file = os.getenv("GITHUB_ENV")
           with open(env_file, "a") as f:
-              f.write(f"\n{'\n'.join(lines)}\n")
+              if os.getenv("GITHUB_ACTIONS") == "true":
+                  f.write("\n".join(lines))
+              else:
+                  f.write("\n" + "\n".join(lines) + "\n")
 
 
       def potential_secret(obj: str):
