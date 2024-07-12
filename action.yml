@@ -1,0 +1,262 @@
+name: Python Setup Environment
+author: kassett
+description: "This GitHub Action allows you to assume an AWS role, extract keys from
+  AWS Secrets Manager, inject them as environment variables, and connect to VPN services
+  like Tailscale and Pritunl."
+
+inputs:
+  python-version:
+    description: 'The description of the Python version to be used. For now it must
+      be supported by setup-python3'
+    default: "3.9"
+    required: false
+
+  install-docker:
+    description: 'Installation of Docker and Docker Compose.'
+    required: false
+    default: "false"
+
+  connect-to-vpn:
+    description: 'The name of the VPN to connect. Currently OpenVPN, Pritunl and Tailscale
+      are supported.'
+    required: false
+    default: ''
+
+  aws-role:
+    description: 'AWS role to assume.'
+    default: ''
+    required: false
+
+  aws-region:
+    description: 'AWS role region.'
+    default: ''
+    required: false
+
+  aws-secrets:
+    description: 'Extract AWS secrets as variables.'
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+  - name: Checkout code
+    uses: actions/checkout@v3
+
+  - name: Install Docker Compose
+    if: ${{ inputs.install-docker != 'false' }}
+    uses: ndeloof/install-compose-action@v0.0.1
+    with:
+      version: v2.1.0
+
+  - name: Set up Docker Buildx
+    if: ${{ inputs.install-docker != 'false' }}
+    uses: docker/setup-buildx-action@v2
+
+  - name: Set up Python x
+    uses: actions/setup-python@v3
+    with:
+      python-version: ${{ inputs.python-version }}
+
+  - name: Set up Node
+    uses: actions/setup-node@v3
+    with:
+      node-version: 20
+
+  - name: Assume AWS Role
+    if: ${{ inputs.aws-role != '' && inputs.aws-region != '' }}
+    uses: aws-actions/configure-aws-credentials@v4
+    with:
+      aws-region: ${{ inputs.aws-region }}
+      role-to-assume: ${{ inputs.aws-role }}
+
+  - name: Install Boto3
+    if: ${{ inputs.aws-secrets != '' && inputs.aws-region != '' }}
+    shell: bash
+    run: |
+      pip install boto3
+
+  - name: Grab AWS Keys
+    id: extract_keys
+    if: ${{ inputs.aws-secrets != '' && inputs.aws-region != '' }}
+    shell: python
+    env:
+      AWS_KEYS: ${{ inputs.aws-secrets }}
+      AWS_DEFAULT_REGION: ${{ inputs.aws-region }}
+    run: |
+      import json
+      import os
+
+      import boto3
+
+
+      def clean_input(payload: str):
+          payload = payload.replace("\n", "")
+          secrets = payload.split(",")
+          [secret.strip() for secret in secrets]
+          return [x for x in secrets if x != ""]
+
+
+      def coalesce(*args):
+          if isinstance(args, tuple) and len(args) == 1 and isinstance(args[0], list | tuple):
+              args = args[0]
+          for arg in args:
+              if arg is not None:
+                  return arg
+          return None
+
+
+      def extract_secrets(secrets: list[str]):
+          secrets_to_retrieve = [potential_secret(i) for i in secrets]
+
+          client = boto3.client("secretsmanager")
+          paginator = client.get_paginator("list_secrets")
+          map_secret_arns(paginator, secrets_to_retrieve)
+          return {
+              key: value
+              for d in secrets_to_retrieve
+              for key, value in d.resolve(client).items()
+          }
+
+
+      def inject_to_environment(variables):
+          lines = [f"{k}={v}" for k, v in variables.items()]
+          env_file = os.getenv("GITHUB_ENV")
+          with open(env_file, "a") as f:
+              f.write(f"\n{'\n'.join(lines)}\n")
+
+
+      def potential_secret(obj: str):
+          temp = {}
+
+          t = obj.split("=") if "=" in obj else [None, obj]
+
+          if t[1].endswith("*"):
+              temp["secret_name_prefix"] = t[1][0:-1]
+          else:
+              temp["secret_name"] = t[1]
+
+          temp["env_name"] = t[0]
+          return Secret(**temp)
+
+
+      def valid_json(obj: str) -> bool:
+          try:
+              if unmarshalled := json.loads(obj):
+                  return isinstance(unmarshalled, list | dict)
+          except json.JSONDecodeError:
+              return False
+          return False
+
+
+      class UnmappedSecretError(AttributeError):
+          def __init__(self, secret_name: str):
+              message = (
+                  f"The secret {secret_name} is not a JSON, and therefore "
+                  f"must explicitly be given for the environment variable. "
+                  f"The can be done as follows: ENV_VAR=secret_name."
+              )
+              super().__init__(message)
+
+
+      class Secret:
+          def __init__(
+              self,
+              env_name: str | None = None,
+              secret_name: str | None = None,
+              secret_name_prefix: str | None = None,
+          ):
+              self.env_name = env_name
+              self.secret_name = secret_name
+              self.secret_name_prefix = secret_name_prefix
+              self.arn = None
+
+          def __eq__(self, other):
+              if not isinstance(other, type(self)):
+                  return False
+
+              params = ["arn", "env_name", "secret_name", "secret_name_prefix"]
+              return all(getattr(self, param) == getattr(other, param) for param in params)
+
+          def __str__(self):
+              values = {}
+              params = ["arn", "env_name", "secret_name", "secret_name_prefix"]
+              for param in params:
+                  if (value := getattr(self, param)) is not None:
+                      values[param.upper()] = value
+              return str(values)
+
+          def resolve(self, client):
+              put = {}
+              value = client.get_secret_value(SecretId=self.arn)
+              secret_string = value["SecretString"]
+              prefix = coalesce(self.env_name, "")
+              if valid_json(value["SecretString"]):
+                  secret_string = json.loads(secret_string)
+                  for k, v in secret_string.items():
+                      k = prefix + k
+                      k = k.upper().replace("-", "_")
+                      put[k] = v
+              else:
+                  if self.env_name is None:
+                      raise UnmappedSecretError(self.secret_name or self.secret_name_prefix)
+                  name = coalesce(
+                      self.env_name,
+                      value["Name"],
+                  )
+                  name = name.upper().replace("-", "_")
+                  put[name] = value["SecretString"]
+              return put
+
+
+      def map_secret_arns(paginator, secrets: list[Secret]):
+          for page in paginator.paginate():
+              for name in page["SecretList"]:
+                  i = next(
+                      (
+                          i
+                          for i, x in enumerate(secrets)
+                          if x.secret_name is not None and x.secret_name == name["Name"]
+                      ),
+                      None,
+                  )
+                  if i is not None:
+                      secrets[i].arn = name["ARN"]
+                  i = next(
+                      (
+                          i
+                          for i, x in enumerate(secrets)
+                          if x.secret_name_prefix is not None
+                          and name["Name"].startswith(x.secret_name_prefix)
+                      ),
+                      None,
+                  )
+                  if i is not None:
+                      secrets[i].arn = name["ARN"]
+
+
+      def main():
+          keys = os.environ.get("AWS_KEYS")
+          injections = extract_secrets(clean_input(keys))
+          inject_to_environment(injections)
+
+
+      if __name__ == "__main__":
+          main()
+
+
+  - name: Connect to Tailscale
+    if: ${{ inputs.connect-to-vpn == 'tailscale' }}
+    uses: tailscale/github-action@v2
+    with:
+      oauth-client-id: ${{ env.TAILSCALE_OAUTH_CLIENT_ID }}
+      oauth-secret: ${{ env.TAILSCALE_OAUTH_SECRET }}
+      tags: ${{ env.TAILSCALE_TAGS }}
+
+  - name: Connect to Pritunl
+    if: ${{ inputs.connect-to-vpn == 'pritunl' }}
+    uses: nathanielvarona/pritunl-client-github-action@v1
+    with:
+      profile-file: ${{ env.PRITUNL_PROFILE_FILE }}
+      profile-pin: ${{ env.PRITUNL_PROFILE_PIN }}
+      profile-server: ${{ env.PRITUNL_PROFILE_SERVER }}
