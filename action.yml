@@ -16,6 +16,11 @@ inputs:
     required: false
     default: "false"
 
+  docker-compose-version:
+    description: 'Version of docker compose to install. Defaults to `latest`'
+    required: false
+    default: 'latest'
+
   connect-to-vpn:
     description: 'The name of the VPN to connect. Currently OpenVPN, Pritunl and Tailscale
       are supported.'
@@ -47,7 +52,7 @@ runs:
     if: ${{ inputs.install-docker != 'false' }}
     uses: ndeloof/install-compose-action@v0.0.1
     with:
-      version: v2.1.0
+      version: ${{ inputs.docker-compose-version }}
 
   - name: Set up Docker Buildx
     if: ${{ inputs.install-docker != 'false' }}
