@@ -16,6 +16,11 @@ inputs:
     required: false
     default: "false"
 
+  docker-compose-version:
+    description: "The docker-compose version to install."
+    required: false
+    default: "latest"
+
   connect-to-vpn:
     description: 'The name of the VPN to connect. Currently OpenVPN, Pritunl and Tailscale
       are supported.'
@@ -47,9 +52,9 @@ runs:
     if: ${{ inputs.install-docker != 'false' }}
     uses: ndeloof/install-compose-action@v0.0.1
     with:
-      version: v2.1.0
+      version: ${{ inputs.docker-compose-version }}
 
-  - name: Set up Docker Buildx
+  - name: Set up Docker Build
     if: ${{ inputs.install-docker != 'false' }}
     uses: docker/setup-buildx-action@v2
 
@@ -89,6 +94,8 @@ runs:
 
       import boto3
 
+      GITHUB_ENV_FILE_VARIABLE_NAME = "GITHUB_ENV"
+
 
       def clean_input(payload: str):
           payload = payload.replace("\n", "")
@@ -121,7 +128,7 @@ runs:
 
       def inject_to_environment(variables):
           lines = [f"{k}={v}" for k, v in variables.items()]
-          env_file = os.getenv("GITHUB_ENV")
+          env_file = os.getenv(GITHUB_ENV_FILE_VARIABLE_NAME)
           with open(env_file, "a") as f:
               f.write("\n".join(lines))
 
@@ -236,7 +243,7 @@ runs:
 
 
       def main():
-          keys = os.environ.get("AWS_KEYS")
+          keys = os.getenv("AWS_KEYS")
           injections = extract_secrets(clean_input(keys))
           inject_to_environment(injections)
 
