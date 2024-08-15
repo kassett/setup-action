@@ -10,8 +10,8 @@ inject them as environment variables, and connect to VPN services like Tailscale
 
 | Input            | Description                                                                          | Default | Required |
 |------------------|--------------------------------------------------------------------------------------|---------|----------|
-| `python-version` | The version of Python to be used. Must be supported by setup-python3.                | "3.9"   | false    |
-| `install-docker` | Whether to install Docker and Docker Compose.                                        | "false" | false    |
+| `python-version` | The version of Python to be used. Must be supported by setup-python3.                | `3.9`   | false    |
+| `install-docker` | Whether to install Docker and Docker Compose.                                        | `false` | false    |
 | `connect-to-vpn` | The name of the VPN to connect to. Supported options are "pritunl", and "tailscale". | ""      | false    |
 | `aws-role`       | The AWS role to assume.                                                              | ""      | false    |
 | `aws-region`     | The AWS region for the assumed role.                                                 | ""      | false    |
