@@ -8,14 +8,16 @@ inject them as environment variables, and connect to VPN services like Tailscale
 
 ## Inputs
 
-| Input            | Description                                                                          | Default | Required |
-|------------------|--------------------------------------------------------------------------------------|---------|----------|
-| `python-version` | The version of Python to be used. Must be supported by setup-python3.                | `3.9`   | false    |
-| `install-docker` | Whether to install Docker and Docker Compose.                                        | `false` | false    |
-| `connect-to-vpn` | The name of the VPN to connect to. Supported options are "pritunl", and "tailscale". | ""      | false    |
-| `aws-role`       | The AWS role to assume.                                                              | ""      | false    |
-| `aws-region`     | The AWS region for the assumed role.                                                 | ""      | false    |
-| `aws-secrets`    | Comma-separated list of AWS secrets to extract and inject as environment variables.  | ""      | false    |
+| Input                         | Description                                                                          | Default | Required |
+|-------------------------------|--------------------------------------------------------------------------------------|---------|----------|
+| `python-version`              | The version of Python to be used.                                                    | `3.10`  | false    |
+| `node-version`                | The version of Node to be used.                                                      | `20`    | false    |
+| `install-docker`              | Whether to install Docker and Docker Compose.                                        | `false` | false    |
+| `connect-to-vpn`              | The name of the VPN to connect to. Supported options are "pritunl", and "tailscale". | ""      | false    |
+| `aws-role`                    | The AWS role to assume.                                                              | ""      | false    |
+| `aws-region`                  | The AWS region for the assumed role.                                                 | ""      | false    |
+| `aws-secrets`                 | Comma-separated list of AWS secrets to extract and inject as environment variables.  | ""      | false    |
+| `python-packages-for-install` | Comma-separated list of Python packages to install via Pipx.                         | ""      | false    |
 
 ## Assuming roles
 In order to assume a role, you must have configured your GitHub Action to have AWS privileges.
