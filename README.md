@@ -90,10 +90,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Setup environment
-        uses: kassett/setup-action@v1
+        uses: kassett/setup-action@v3
         with:
           aws-secrets: "json-secret*,name=flat-secret"
           connect-to-vpn: "tailscale"
