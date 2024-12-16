@@ -6,9 +6,14 @@ description: "This GitHub Action allows you to assume an AWS role, extract keys 
 
 inputs:
   python-version:
-    description: 'The description of the Python version to be used. For now it must
-      be supported by setup-python3'
-    default: "3.9"
+    description: 'The description of the Python version to be used.'
+    default: "3.10"
+    required: false
+
+  node-version:
+    description: 'The description of the Node version to be used. For now it must
+      be supported by setup-node'
+    default: "20"
     required: false
 
   install-docker:
@@ -42,6 +47,12 @@ inputs:
     required: false
     default: ''
 
+  python-packages-for-install:
+    description: "Install certain packages using pipx (comma-separated-list). Pipx
+      can be used safely to install further packages."
+    default: ''
+    required: false
+
 runs:
   using: composite
   steps:
@@ -57,18 +68,34 @@ runs:
     uses: docker/setup-buildx-action@v2
 
   - name: Set up Python x
-    uses: actions/setup-python@v3
+    uses: actions/setup-python@v5.3.0
     with:
       python-version: ${{ inputs.python-version }}
 
-  - name: Set up Node
-    uses: actions/setup-node@v3
+  - name: Changes packages from a comma separated list to a space separated list
+    id: get_packages
+    shell: bash
+    env:
+      PACKAGE_LIST: ${{ inputs.python-packages-for-install }}
+    run: |
+      # Convert the comma-separated list to a space-separated list using Python
+      SPACE_SEPARATED_LIST=$(python -c "print(' '.join('$PACKAGE_LIST'.split(',')))")
+      # Output the result for subsequent steps
+      echo "space-separated-list=$SPACE_SEPARATED_LIST" >> $GITHUB_OUTPUT
+
+  - name: Install Pipx and packages
+    uses: threeal/pipx-install-action@v1.0.0
     with:
-      node-version: 20
+      packages: ${{ steps.get_packages.outputs.space-separated-list }}
+
+  - name: Set up Node
+    uses: actions/setup-node@v4.1.0
+    with:
+      node-version: ${{ inputs.node-version }}
 
   - name: Assume AWS Role
     if: ${{ inputs.aws-role != '' && inputs.aws-region != '' }}
-    uses: aws-actions/configure-aws-credentials@v4
+    uses: aws-actions/configure-aws-credentials@v4.0.2
     with:
       aws-region: ${{ inputs.aws-region }}
       role-to-assume: ${{ inputs.aws-role }}
