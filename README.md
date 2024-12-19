@@ -17,7 +17,6 @@ inject them as environment variables, and connect to VPN services like Tailscale
 | `aws-role`                    | The AWS role to assume.                                                              | ""      | false    |
 | `aws-region`                  | The AWS region for the assumed role.                                                 | ""      | false    |
 | `aws-secrets`                 | Comma-separated list of AWS secrets to extract and inject as environment variables.  | ""      | false    |
-| `python-packages-for-install` | Comma-separated list of Python packages to install via Pipx.                         | ""      | false    |
 
 ## Assuming roles
 In order to assume a role, you must have configured your GitHub Action to have AWS privileges.
