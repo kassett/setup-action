@@ -72,22 +72,6 @@ runs:
     with:
       python-version: ${{ inputs.python-version }}
 
-  - name: Changes packages from a comma separated list to a space separated list
-    id: get_packages
-    shell: bash
-    env:
-      PACKAGE_LIST: ${{ inputs.python-packages-for-install }}
-    run: |
-      # Convert the comma-separated list to a space-separated list using Python
-      SPACE_SEPARATED_LIST=$(python -c "print(' '.join('$PACKAGE_LIST'.split(',')))")
-      # Output the result for subsequent steps
-      echo "space-separated-list=$SPACE_SEPARATED_LIST" >> $GITHUB_OUTPUT
-
-  - name: Install Pipx and packages
-    uses: threeal/pipx-install-action@v1.0.0
-    with:
-      packages: ${{ steps.get_packages.outputs.space-separated-list }}
-
   - name: Set up Node
     uses: actions/setup-node@v4.1.0
     with:
