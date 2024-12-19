@@ -47,12 +47,6 @@ inputs:
     required: false
     default: ''
 
-  python-packages-for-install:
-    description: "Install certain packages using pipx (comma-separated-list). Pipx
-      can be used safely to install further packages."
-    default: ''
-    required: false
-
 runs:
   using: composite
   steps:
